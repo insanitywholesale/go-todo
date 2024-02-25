@@ -1,0 +1,2 @@
+# avoid storing SQLite3 database file
+todo.db
