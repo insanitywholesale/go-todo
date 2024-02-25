@@ -5,13 +5,39 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite" // no-CGo database/sql driver for sqlite
 )
 
 // Global database object
 var db *sql.DB
+
+// HTTP handler for the root endpoint
+func Home(w http.ResponseWriter, _ *http.Request) {
+	welcomeMessage := "Welcome to the Todo API demo"
+	_, err := w.Write([]byte(welcomeMessage))
+	if err != nil {
+		log.Println("[Home] error writing to client:", err)
+	}
+}
+
+func ReadTodos(_ http.ResponseWriter, _ *http.Request) {
+}
+
+func ReadTodo(_ http.ResponseWriter, _ *http.Request) {
+}
+
+func CreateTodo(_ http.ResponseWriter, _ *http.Request) {
+}
+
+func UpdateTodo(_ http.ResponseWriter, _ *http.Request) {
+}
+
+func DeleteTodo(_ http.ResponseWriter, _ *http.Request) {
+}
 
 // SetupDB initializes the database and returns a client object to access it
 func SetupDB() (*sql.DB, error) {
@@ -70,6 +96,22 @@ func SetupDB() (*sql.DB, error) {
 	return sqlite, nil
 }
 
+// SetupRouter creates and returns a new HTTP router
+func SetupRouter() http.Handler {
+	router := &http.ServeMux{}
+
+	// Set up HTTP routes
+	router.HandleFunc("GET /", Home)                        // Display homepage
+	router.HandleFunc("GET /todo", ReadTodos)               // Return all todo items
+	router.HandleFunc("GET /todos", ReadTodos)              // Return all todo items
+	router.HandleFunc("GET /todo/{todo_id}", ReadTodo)      // Return a todo item by ID
+	router.HandleFunc("POST /todo", CreateTodo)             // Add a todo item and return it
+	router.HandleFunc("PUT /todo/{todo_id}", UpdateTodo)    // Change a todo item by ID
+	router.HandleFunc("DELETE /todo/{todo_id}", DeleteTodo) // Remove a todo item by ID
+
+	return router
+}
+
 func main() {
 	// Create database object
 	mydb, err := SetupDB()
@@ -88,4 +130,27 @@ func main() {
 	if err != nil {
 		log.Fatalln("[main] error pinging sqlite database:", err)
 	}
+
+	// Create HTTP router
+	router := SetupRouter()
+
+	// Get HTTP server port from environment
+	port := os.Getenv("TODO_PORT")
+	// If the environment variable is empty use port 8080
+	if port == "" {
+		port = "8080"
+	}
+
+	// Create and configure HTTP server
+	server := &http.Server{
+		Addr:              ":" + port, // Listen on all interfaces on the port defined above
+		Handler:           router,
+		ReadHeaderTimeout: 2 * time.Second, // Prevent slowloris attack
+	}
+
+	// Print a nice message on the terminal
+	log.Println("[main] starting server at port 8080")
+
+	// Start the server and in case that fails print an error message
+	log.Fatalln("[main] error starting server:", server.ListenAndServe())
 }
