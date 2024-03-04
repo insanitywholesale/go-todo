@@ -137,7 +137,92 @@ func ReadTodos(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func ReadTodo(_ http.ResponseWriter, _ *http.Request) {
+// HTTP handler for getting a todo item
+func ReadTodo(w http.ResponseWriter, r *http.Request) {
+	// Get URL parameter named todo_id
+	todoIDfromURL := r.PathValue("todo_id")
+	if todoIDfromURL == "" {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 400
+		w.WriteHeader(http.StatusBadRequest)
+		// Create a new error of our custom type
+		e := NewHTTPError("Parameter todo_id is empty", http.StatusBadRequest, "Bad Request")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[ReadTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	todoID, err := strconv.Atoi(todoIDfromURL)
+	if err != nil {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 400
+		w.WriteHeader(http.StatusBadRequest)
+		// Create a new error of our custom type
+		e := NewHTTPError("Parameter todo_id is not a number", http.StatusBadRequest, "Bad Request")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[ReadTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	// Todo item we are going to return
+	var todo TodoItem
+
+	// Get row from the todo table in the database with the id
+	row := db.QueryRow(`SELECT id, description, done FROM todo WHERE id = ?;`, todoID)
+	// Put row from database into variable
+	err = row.Scan(&todo.ID, &todo.Description, &todo.Done)
+	if err != nil {
+		// If the error is that no rows were returned that's not actually our problem
+		if errors.Is(err, sql.ErrNoRows) {
+			// Tell the client that we are going to return JSON
+			w.Header().Add("Content-Type", "application/json")
+			// Tell the client that the status of the request is 404
+			w.WriteHeader(http.StatusNotFound)
+			// Create a new error of our custom type
+			e := NewHTTPError(err.Error(), http.StatusNotFound, "Not Found")
+			// Return the JSON-encoded error message
+			err := json.NewEncoder(w).Encode(e)
+			if err != nil {
+				// Log encoding error for debugging
+				log.Println("[ReadTodo] error encoding error:", err)
+			}
+			return
+		}
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 500
+		w.WriteHeader(http.StatusInternalServerError)
+		// Create a new error of our custom type
+		e := NewHTTPError(err.Error(), http.StatusInternalServerError, "General Error")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[ReadTodo] error encoding error:", err)
+			return
+		}
+	}
+
+	// Tell the client that we are going to return JSON
+	w.Header().Add("Content-Type", "application/json")
+	// Tell the client that the status of the request is 200
+	w.WriteHeader(http.StatusOK)
+	// Return the JSON-encoded todo item
+	err = json.NewEncoder(w).Encode(todo)
+	if err != nil {
+		// Log encoding error for debugging
+		log.Println("[ReadTodo] error encoding todo item:", err)
+	}
 }
 
 func CreateTodo(_ http.ResponseWriter, _ *http.Request) {
