@@ -2,15 +2,48 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	_ "modernc.org/sqlite" // no-CGo database/sql driver for sqlite
 )
+
+// TodoItem
+type TodoItem struct {
+	ID          int64  `json:"id"`
+	Description string `json:"description"`
+	Done        bool   `json:"done"`
+}
+
+// HTTPError is a custom HTTP error type
+type HTTPError struct {
+	Message string `json:"error"`
+	Detail  string `json:"detail"` // the error as a string
+	Status  int    `json:"status"`
+}
+
+// Error returns the custom HTTPError as a string
+func (e *HTTPError) Error() string {
+	if e.Message == "" {
+		return e.Detail
+	}
+	return e.Detail + " : " + e.Message
+}
+
+// NewHTTPError produces a native Go error
+func NewHTTPError(err string, status int, detail string) error {
+	return &HTTPError{
+		Message: err,
+		Detail:  detail,
+		Status:  status,
+	}
+}
 
 // Global database object
 var db *sql.DB
@@ -247,7 +280,7 @@ func CreateTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Save todo item in database and return generated id
-	res, err := db.Exec(`INSERT INTO todo (done, description) VALUES (?, ?) RETURNING id;`,
+	res, err := db.Exec(`INSERT INTO todo (done, description) VALUES (?, ?);`,
 		&todo.Done,
 		&todo.Description,
 	)
@@ -435,7 +468,7 @@ func UpdateTodo(w http.ResponseWriter, r *http.Request) {
 		// Tell the client that the status of the request is 404
 		w.WriteHeader(http.StatusInternalServerError)
 		// Create a new error of our custom type
-		e := NewHTTPError("deleted more than 1 record", http.StatusInternalServerError, "Internal Server Error")
+		e := NewHTTPError("updated more than 1 record", http.StatusInternalServerError, "Internal Server Error")
 		// Return the JSON-encoded error message
 		err := json.NewEncoder(w).Encode(e)
 		if err != nil {
