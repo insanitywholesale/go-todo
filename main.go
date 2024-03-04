@@ -447,7 +447,114 @@ func UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteTodo(_ http.ResponseWriter, _ *http.Request) {
+// HTTP handler for deleting a todo item
+func DeleteTodo(w http.ResponseWriter, r *http.Request) {
+	// Get URL parameter named todo_id
+	todoIDfromURL := r.PathValue("todo_id")
+	if todoIDfromURL == "" {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 400
+		w.WriteHeader(http.StatusBadRequest)
+		// Create a new error of our custom type
+		e := NewHTTPError("Parameter todo_id is empty", http.StatusBadRequest, "Bad Request")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	todoID, err := strconv.Atoi(todoIDfromURL)
+	if err != nil {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 400
+		w.WriteHeader(http.StatusBadRequest)
+		// Create a new error of our custom type
+		e := NewHTTPError("Parameter todo_id is not a number", http.StatusBadRequest, "Bad Request")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	// Delete todo item from database
+	res, err := db.Exec(`DELETE FROM todo WHERE id = ?;`, todoID)
+	if err != nil {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 500
+		w.WriteHeader(http.StatusInternalServerError)
+		// Create a new error of our custom type
+		e := NewHTTPError(err.Error(), http.StatusInternalServerError, "General Error")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 500
+		w.WriteHeader(http.StatusInternalServerError)
+		// Create a new error of our custom type
+		e := NewHTTPError(err.Error(), http.StatusInternalServerError, "General Error")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	}
+
+	switch rowsAffected {
+	case 0:
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 404
+		w.WriteHeader(http.StatusNotFound)
+		// Create a new error of our custom type
+		e := NewHTTPError("No todo with id "+strconv.Itoa(todoID)+" exists", http.StatusNotFound, "Not Found")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	case 1:
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 204
+		w.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		// Tell the client that we are going to return JSON
+		w.Header().Add("Content-Type", "application/json")
+		// Tell the client that the status of the request is 404
+		w.WriteHeader(http.StatusInternalServerError)
+		// Create a new error of our custom type
+		e := NewHTTPError("deleted more than 1 record", http.StatusInternalServerError, "Internal Server Error")
+		// Return the JSON-encoded error message
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			// Log encoding error for debugging
+			log.Println("[DeleteTodo] error encoding error:", err)
+		}
+		return
+	}
 }
 
 // SetupDB initializes the database and returns a client object to access it
