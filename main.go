@@ -671,7 +671,7 @@ func main() {
 	}
 
 	// Print a nice message on the terminal
-	log.Println("[main] database intialized successfully")
+	log.Println("[main] database initialized successfully")
 
 	// Assign returned database client object to the global variable
 	db = mydb
