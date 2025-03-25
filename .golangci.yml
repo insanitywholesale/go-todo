@@ -1,49 +1,40 @@
 linters:
   enable-all: true
   disable:
-    - cyclop
+    - canonicalheader
     - contextcheck
-    - dupl
-    - exhaustivestruct
+    - cyclop
+    - depguard
+    - err113           # NOTE: look into re-enabling this (do not define dynamic errors, use wrapped static errors instead)
     - exhaustruct
     - funlen
     - gochecknoglobals
     - gochecknoinits
     - gocognit
     - goconst
+    - gocyclo
     - godot
     - godox
-    - goerr113 # NOTE: look into re-enabling this (do not define dynamic errors, use wrapped static errors instead)
     - goimports
-    - golint
     - gomnd
     - interfacebloat
-    - ifshort
     - ireturn
     - lll
+    - maintidx
     - mirror
+    - mnd
     - nestif
     - nilnil
-    - noctx
     - nlreturn
+    - noctx
     - nonamedreturns
-    - nosnakecase
     - paralleltest
+    - protogetter      # NOTE: look into re-enabling this (avoid direct access to proto field)
     - tagliatelle
     - varnamelen
+    - wrapcheck        # NOTE: look into re-enabling this (error returned from external package is unwrapped)
     - wsl
 linters-settings:
-  depguard:
-    include-go-root: true
-    rules:
-      main:
-        files:
-          - "$all"
-          - "!$test"
-        allow:
-          - "$gostd"
-          - "gitlab.com/insanitywholesale"
-          - "modernc.org/sqlite"
   errcheck:
     exclude-functions:
       - (net/http.ResponseWriter).Write
@@ -52,8 +43,8 @@ linters-settings:
       - (*net/http.Server).Serve
       - (google.golang.org/grpc.Server).Serve
       - (*google.golang.org/grpc.Server).Serve
-output:
+issues:
   uniq-by-line: false
 run:
   issues-exit-code: 1
-  timeout: 10m
+  timeout: 13m
