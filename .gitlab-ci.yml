@@ -1,0 +1,111 @@
+image: golang:1.24
+cache:
+  - key: module-cache-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache
+
+variables:
+  REPO_NAME: gitlab.com/insanitywholesale/go-todo
+  PLATFORMS: linux/amd64,linux/arm64
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
+
+services:
+  - name: docker:dind
+    alias: docker
+
+before_script:
+  - mkdir -p .cache
+  - export GOPATH="$CI_PROJECT_DIR/.cache"
+
+stages:
+  - format
+  - build
+  - test
+  - release
+  - deploy
+
+check_format:
+  stage: format
+  script:
+    - rm -rf .cache/pkg
+    - test -z "$(gofmt -l .)"
+
+compile:
+  stage: build
+  needs:
+    - check_format
+  script:
+    - go build -race -ldflags "-extldflags '-static'" -o $CI_PROJECT_DIR/$CI_PROJECT_NAME
+  artifacts:
+    paths:
+      - $CI_PROJECT_DIR/$CI_PROJECT_NAME
+
+vet:
+  stage: test
+  needs:
+    - compile
+  script:
+    - go vet -v ./...
+
+lint:
+  image: golangci/golangci-lint:latest
+  stage: test
+  needs:
+    - compile
+  script:
+    - golangci-lint run -v
+
+unit_test:
+  stage: test
+  needs:
+    - vet
+  script:
+    - go test -v ./...
+    - go test -v -race ./...
+
+mod_update_test:
+  stage: test
+  needs:
+    - vet
+    - unit_test
+  script:
+    - rm go.mod go.sum
+    - go mod init $REPO_NAME
+    - go mod tidy
+    - go get -u -v ./...
+    - go mod tidy
+    - go test -v ./...
+    - go test -v -race ./...
+
+fake_release:
+  image:
+    name: goreleaser/goreleaser:latest
+    entrypoint: [""]
+  stage: release
+  needs:
+    - vet
+    - lint
+    - unit_test
+    - mod_update_test
+  script:
+    - go get -v
+    - goreleaser --snapshot --skip=publish --clean
+
+docker_image:
+  image:
+    name: docker:dind
+  stage: release
+  needs:
+    - vet
+    - lint
+    - unit_test
+    - mod_update_test
+  before_script:
+    - apk add --no-cache tzdata
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker buildx create --platform ${PLATFORMS} --name gitlabci --use
+    - docker buildx inspect gitlabci
+  script:
+    - docker buildx build --push --platform ${PLATFORMS} -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG -t $CI_REGISTRY_IMAGE:latest .
